@@ -1,0 +1,619 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desert Strike FPS</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#171513;color:#fff;font-family:Arial,"Malgun Gothic",sans-serif}
+button{cursor:pointer;color:#fff;background:#252b30;border:1px solid #626b70;border-radius:5px;padding:9px}
+button:hover{background:#b78b4c;color:#151515}
+button.selected{border:2px solid #f0c36d;background:#55452d}
+#game{display:block;width:100vw;height:100vh}
+#hud{position:fixed;inset:0;pointer-events:none}
+.panel{background:#171b20dd;border:1px solid #7a7669;border-radius:5px;padding:9px}
+#top{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.stat{text-align:center;min-width:76px}
+.label{font-size:11px;color:#c8c1b4}
+.value{font-size:20px;font-weight:bold;margin-top:3px}
+#healthPanel{position:absolute;left:15px;bottom:15px;display:flex;gap:15px;align-items:center}
+#healthBar{height:8px;width:130px;background:#454545;margin-top:5px}
+#healthFill{height:100%;width:100%;background:#5fce87}
+#ammoPanel{position:absolute;right:15px;bottom:15px;text-align:right;min-width:160px}
+#weaponName{font-size:20px;font-weight:bold}
+#crosshair{position:absolute;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%)}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 3px #000}
+#crosshair:before{width:2px;height:16px;left:7px}
+#crosshair:after{height:2px;width:16px;top:7px}
+#message{position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:23px;font-weight:bold;text-shadow:0 2px 5px #000;text-align:center}
+#slots{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+.slot{padding:6px 10px;background:#171b20dc;border:1px solid #888;font-size:12px}
+.slot.active{border-color:#f0c36d;color:#f0c36d}
+#hint{position:absolute;top:72px;left:50%;transform:translateX(-50%);font-size:12px;text-shadow:0 2px 4px #000;text-align:center}
+#feed{position:absolute;right:12px;top:90px;text-align:right;font-size:12px;text-shadow:0 1px 3px #000}
+#overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:#080a0ce8}
+#overlay.hidden{display:none}
+.modal{width:min(850px,95vw);max-height:94vh;overflow:auto;background:#191e22;border:1px solid #8d826d;padding:20px;border-radius:8px}
+h1{margin:0;font-size:28px;letter-spacing:2px}
+h2{font-size:17px;color:#f0c36d;margin:18px 0 10px}
+.sub{color:#c5c5c5;font-size:13px;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.card{background:#252b30;border:1px solid #5d6264;text-align:left;min-height:83px;padding:10px}
+.card strong{display:block;margin-bottom:6px}
+.card span{display:block;font-size:12px;color:#d4d0c7;margin-top:3px}
+.character{min-height:115px;text-align:center}
+.avatar{height:44px;width:44px;border-radius:50%;margin:0 auto 7px;display:grid;place-items:center;font-size:20px;font-weight:bold;color:#111;border:2px solid #eee}
+#tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+#bottomBar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+#notice{color:#f0c36d;font-size:13px;min-height:19px;margin-top:9px}
+@media(max-width:600px){
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #top{top:4px;gap:2px}.stat{min-width:54px}.value{font-size:15px}
+ #hint{top:55px;font-size:10px}
+ #healthPanel{left:4px;bottom:4px;padding:6px;gap:6px}
+ #ammoPanel{right:4px;bottom:4px;padding:6px}
+ #slots{bottom:75px}
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+ <div id="top">
+  <div class="panel stat"><div class="label">라운드</div><div class="value" id="round">1</div></div>
+  <div class="panel stat"><div class="label">남은 적</div><div class="value" id="enemyCount">0</div></div>
+  <div class="panel stat"><div class="label">처치</div><div class="value" id="kills">0</div></div>
+  <div class="panel stat"><div class="label">돈</div><div class="value" id="money">$800</div></div>
+ </div>
+ <div id="hint">WASD 이동 · 마우스 조준 · 클릭 사격 · Space 점프 · B 상점</div>
+ <div id="message"></div>
+ <div id="crosshair"></div>
+ <div id="feed"></div>
+ <div id="healthPanel" class="panel">
+  <div><div class="label">체력</div><div class="value" id="health">100</div><div id="healthBar"><div id="healthFill"></div></div></div>
+  <div><div class="label">방어구</div><div class="value" id="armor">0</div></div>
+  <div><div class="label">캐릭터</div><div class="value" id="characterHUD">제트</div></div>
+ </div>
+ <div id="ammoPanel" class="panel">
+  <div id="weaponName">Glock-18</div>
+  <div class="value" id="ammo">20 / 60</div>
+  <div class="label" id="weaponInfo">권총</div>
+ </div>
+ <div id="slots">
+  <div class="slot" id="s1">1 주총</div>
+  <div class="slot active" id="s2">2 권총</div>
+  <div class="slot" id="s3">3 칼</div>
+  <div class="slot" id="s4">4 수류탄</div>
+ </div>
+</div>
+
+<div id="overlay">
+ <div class="modal">
+  <h1 id="title">DESERT STRIKE</h1>
+  <p class="sub" id="subtitle">사막 전술 훈련장 · 캐릭터와 장비를 선택하세요.</p>
+  <h2>캐릭터 선택</h2>
+  <div class="grid" id="characters"></div>
+  <h2>무기 구매 및 장착</h2>
+  <div id="tabs"></div>
+  <div class="grid" id="shop"></div>
+  <div id="notice">기본 권총과 칼을 사용할 수 있습니다. 다른 무기는 돈으로 구매하세요.</div>
+  <div id="bottomBar">
+   <div id="shopMoney">$800</div>
+   <div>
+    <button id="armorBtn">방어구 $650</button>
+    <button id="ammoBtn">탄약 $200</button>
+    <button id="startBtn">전투 시작</button>
+   </div>
+  </div>
+  <p class="sub">
+   조작: WASD 이동 / 마우스 조준 / 왼쪽 클릭 사격 / R 재장전 /
+   Space 점프 / Shift 걷기 / 1 주총 / 2 권총 / 3 칼 / 4 수류탄 / B 상점
+  </p>
+ </div>
+</div>
+
+<script>
+"use strict";
+(() => {
+const $=id=>document.getElementById(id);
+const canvas=$("game"),ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+resize();addEventListener("resize",resize);
+
+const characters=[
+ {id:"jett",name:"제트",symbol:"J",color:"#83d9e9",desc:"빠른 기동"},
+ {id:"reyna",name:"레이나",symbol:"R",color:"#bd7fe6",desc:"공격 중심"},
+ {id:"omen",name:"오멘",symbol:"O",color:"#7588db",desc:"그림자 전사"},
+ {id:"gecko",name:"게코",symbol:"G",color:"#b6d879",desc:"초록 전사"}
+];
+let selectedCharacter="jett";
+const db={
+ rifle:[
+  {id:"ak",name:"AK-47",price:2700,damage:34,mag:30,reserve:90,rate:125,reload:1500,spread:.045,range:18,auto:true},
+  {id:"m4",name:"M4A1",price:3100,damage:28,mag:30,reserve:90,rate:95,reload:1450,spread:.035,range:19,auto:true},
+  {id:"aug",name:"AUG",price:3300,damage:31,mag:30,reserve:90,rate:100,reload:1500,spread:.028,range:21,auto:true},
+  {id:"sg",name:"SG 553",price:3000,damage:32,mag:30,reserve:90,rate:105,reload:1500,spread:.032,range:21,auto:true},
+  {id:"awp",name:"AWP",price:4750,damage:100,mag:5,reserve:25,rate:900,reload:2100,spread:.006,range:25,auto:false,sniper:true},
+  {id:"scout",name:"SSG 08",price:1700,damage:70,mag:10,reserve:30,rate:600,reload:1700,spread:.012,range:23,auto:false,sniper:true}
+ ],
+ pistol:[
+  {id:"glock",name:"Glock-18",price:200,damage:20,mag:20,reserve:60,rate:180,reload:1100,spread:.05,range:14,auto:true},
+  {id:"usp",name:"USP-S",price:200,damage:28,mag:12,reserve:36,rate:260,reload:1200,spread:.025,range:17,auto:false},
+  {id:"deagle",name:"Desert Eagle",price:700,damage:55,mag:7,reserve:35,rate:390,reload:1450,spread:.04,range:18,auto:false},
+  {id:"p250",name:"P250",price:300,damage:25,mag:13,reserve:52,rate:230,reload:1150,spread:.035,range:15,auto:false}
+ ],
+ knife:[
+  {id:"knife",name:"전술 나이프",price:0,damage:55,range:2.2,rate:400},
+  {id:"karambit",name:"카람빗",price:1200,damage:70,range:2.4,rate:470},
+  {id:"tactical",name:"전투 나이프",price:800,damage:62,range:2.3,rate:430}
+ ],
+ grenade:[{id:"grenade",name:"수류탄",price:300,damage:70,range:8,rate:900}]
+};
+const all=Object.values(db).flat();
+const get=id=>all.find(w=>w.id===id);
+const owned=new Set(["glock","knife"]);
+const slots={rifle:null,pistol:"glock",knife:"knife",grenade:null};
+const ammo={};
+all.forEach(w=>ammo[w.id]={mag:w.mag||0,reserve:w.reserve||0});
+let current="glock",tab="rifle",money=800,health=100,armor=0,kills=0,round=1;
+let running=false,gameOver=false,locked=false,mouseDown=false,reloading=false;
+let reloadFinish=0,lastShot=0,lastTime=0;
+let yaw=.0,pitch=0,keys={};
+let player={x:2.5,y:2.5};
+let jumpTime=0,jumpHeight=0;
+let enemies=[],messageUntil=0,message="",hitUntil=0,feedUntil=0,feed="";
+let winTransition=false,damageFlash=0;
+
+// Desert map: 1 = sandstone wall, 0 = walkable ground.
+const map=[
+"11111111111111111111",
+"10000000000000000001",
+"10000000000000000001",
+"10001100000011000001",
+"10001100000011000001",
+"10000000000000000001",
+"10000011001100000001",
+"10000011001100000001",
+"10000000000000000001",
+"10011000000000110001",
+"10011000000000110001",
+"10000000000000000001",
+"10000110000110000001",
+"10000110000110000001",
+"10000000000000000001",
+"10000000000000000001",
+"10000000000000000001",
+"11111111111111111111"
+].map(r=>r.split("").map(Number));
+const MW=map[0].length,MH=map.length;
+const FOV=Math.PI/2.8;
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const angleDiff=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function wall(x,y){
+ let ix=Math.floor(x),iy=Math.floor(y);
+ return ix<0||iy<0||ix>=MW||iy>=MH||map[iy][ix]===1;
+}
+function collides(x,y,r=.2){
+ return wall(x-r,y-r)||wall(x+r,y-r)||wall(x-r,y+r)||wall(x+r,y+r);
+}
+function clearLine(x1,y1,x2,y2){
+ let d=Math.hypot(x2-x1,y2-y1),n=Math.ceil(d*20);
+ for(let i=1;i<n;i++){
+  let t=i/n;
+  if(wall(x1+(x2-x1)*t,y1+(y2-y1)*t))return false;
+ }
+ return true;
+}
+function say(text,ms=1700){message=text;messageUntil=performance.now()+ms}
+function updateHUD(){
+ $("round").textContent=round;
+ $("enemyCount").textContent=enemies.filter(e=>e.hp>0).length;
+ $("kills").textContent=kills;
+ $("money").textContent="$"+money;
+ $("shopMoney").textContent="보유 금액: $"+money;
+ $("health").textContent=Math.ceil(health);
+ $("armor").textContent=Math.ceil(armor);
+ $("characterHUD").textContent=characters.find(c=>c.id===selectedCharacter).name;
+ $("healthFill").style.width=clamp(health,0,100)+"%";
+ $("healthFill").style.background=health<30?"#ed5555":"#5fce87";
+ let w=get(current);
+ $("weaponName").textContent=w.name;
+ $("weaponInfo").textContent=w.mag===undefined?"근접 공격":w.sniper?"저격총":w.id==="grenade"?"투척 무기":w.mag+"발 탄창";
+ $("ammo").textContent=w.mag===undefined?"근접 무기":ammo[w.id].mag+" / "+ammo[w.id].reserve;
+ ["rifle","pistol","knife","grenade"].forEach((t,i)=>{
+  $("s"+(i+1)).classList.toggle("active",w===null?false:t===w.type);
+ });
+ $("feed").textContent=performance.now()<feedUntil?feed:"";
+}
+function renderCharacters(){
+ const el=$("characters");el.innerHTML="";
+ characters.forEach(c=>{
+  let b=document.createElement("button");
+  b.className="card character"+(selectedCharacter===c.id?" selected":"");
+  b.innerHTML=`<div class="avatar" style="background:${c.color}">${c.symbol}</div><strong>${c.name}</strong><span>${c.desc}</span>`;
+  b.onclick=()=>{selectedCharacter=c.id;renderCharacters();updateHUD();$("notice").textContent=c.name+" 선택 완료";};
+  el.appendChild(b);
+ });
+}
+function renderTabs(){
+ $("tabs").innerHTML="";
+ [["rifle","주총"],["pistol","권총"],["knife","칼"],["grenade","수류탄"]].forEach(([id,label])=>{
+  let b=document.createElement("button");b.textContent=label;
+  if(tab===id)b.classList.add("selected");
+  b.onclick=()=>{tab=id;renderShop()};
+  $("tabs").appendChild(b);
+ });
+}
+function renderShop(){
+ renderTabs();
+ const el=$("shop");el.innerHTML="";
+ db[tab].forEach(w=>{
+  let b=document.createElement("button");b.className="card";
+  if(current===w.id)b.classList.add("selected");
+  b.innerHTML=`<strong>${w.name}</strong><span>피해량 ${w.damage}</span><span>${w.mag===undefined?"근접 무기":w.mag+"발 탄창"}</span><span style="color:#f0c36d">${owned.has(w.id)?"보유 중":w.price===0?"무료":"$"+w.price}</span>`;
+  b.onclick=()=>buy(w.id);
+  el.appendChild(b);
+ });
+ updateHUD();
+}
+function buy(id){
+ let w=get(id);
+ if(owned.has(id)){equip(id);$("notice").textContent=w.name+" 장착 완료";renderShop();return}
+ if(money<w.price){$("notice").textContent="돈이 부족합니다.";return}
+ money-=w.price;owned.add(id);
+ ammo[id]={mag:w.mag||0,reserve:w.reserve||0};
+ equip(id);$("notice").textContent=w.name+" 구매 완료";renderShop();
+}
+function equip(id){
+ if(!owned.has(id)){say("먼저 상점에서 구매하세요.");return}
+ let w=get(id);
+ if(db.rifle.includes(w))slots.rifle=id;
+ else if(db.pistol.includes(w))slots.pistol=id;
+ else if(db.knife.includes(w))slots.knife=id;
+ else slots.grenade=id;
+ current=id;reloading=false;updateHUD();
+}
+function switchSlot(type){
+ if(slots[type]&&owned.has(slots[type]))equip(slots[type]);
+ else say(type==="rifle"?"주총이 없습니다. B를 눌러 구매하세요.":"장비가 없습니다. 상점을 이용하세요.");
+}
+function spawnEnemies(){
+ enemies=[];
+ let count=Math.min(3+round*2,15);
+ for(let i=0;i<count;i++){
+  let x=0,y=0,tries=0;
+  do{
+   x=1.5+Math.random()*(MW-3);y=1.5+Math.random()*(MH-3);tries++;
+  }while((collides(x,y,.25)||Math.hypot(x-player.x,y-player.y)<5)&&tries<500);
+  enemies.push({x,y,hp:65+round*8,maxHp:65+round*8,speed:.32+Math.random()*.18+round*.012,nextFire:performance.now()+1000+Math.random()*2000,hit:0});
+ }
+ updateHUD();
+}
+function openShop(){
+ running=false;mouseDown=false;
+ if(document.pointerLockElement)document.exitPointerLock();
+ $("overlay").classList.remove("hidden");
+ $("title").textContent="DESERT STRIKE";
+ $("subtitle").textContent="캐릭터와 무기를 선택하세요.";
+ $("startBtn").textContent=enemies.length&&enemies.every(e=>e.hp<=0)?"다음 라운드 시작":"전투 시작";
+ renderCharacters();renderShop();
+}
+function startGame(){
+ if(gameOver){
+  round=1;kills=0;money=800;health=100;armor=0;
+  owned.clear();owned.add("glock");owned.add("knife");
+  slots.rifle=null;slots.pistol="glock";slots.knife="knife";slots.grenade=null;
+  current="glock";
+  all.forEach(w=>ammo[w.id]={mag:w.mag||0,reserve:w.reserve||0});
+  gameOver=false;enemies=[];
+ }
+ if(enemies.length&&enemies.every(e=>e.hp<=0)){round++;money+=800}
+ health=100;player={x:2.5,y:2.5};yaw=0;pitch=0;jumpTime=0;jumpHeight=0;
+ running=true;reloading=false;winTransition=false;
+ $("overlay").classList.add("hidden");
+ spawnEnemies();say("라운드 "+round+" 시작!");
+ canvas.requestPointerLock?.();
+}
+$("startBtn").onclick=startGame;
+$("armorBtn").onclick=()=>{
+ if(armor>=100){$("notice").textContent="방어구가 가득 찼습니다.";return}
+ if(money<650){$("notice").textContent="돈이 부족합니다.";return}
+ money-=650;armor=100;renderShop();
+};
+$("ammoBtn").onclick=()=>{
+ if(money<200){$("notice").textContent="돈이 부족합니다.";return}
+ money-=200;
+ owned.forEach(id=>{let w=get(id);if(w.mag!==undefined&&w.id!=="grenade")ammo[id].reserve+=w.mag*2});
+ renderShop();
+};
+function reload(){
+ let w=get(current);
+ if(!running||w.mag===undefined||w.id==="grenade"||reloading)return;
+ let a=ammo[current];
+ if(a.mag>=w.mag||a.reserve<=0)return;
+ reloading=true;reloadFinish=performance.now()+(w.reload||1200);say("재장전 중...");
+}
+function completeReload(now){
+ if(!reloading||now<reloadFinish)return;
+ let w=get(current),a=ammo[current];
+ let n=Math.min(w.mag-a.mag,a.reserve);
+ a.mag+=n;a.reserve-=n;reloading=false;updateHUD();
+}
+function fire(){
+ if(!running||reloading)return;
+ let now=performance.now(),w=get(current);
+ if(now-lastShot<(w.rate||400))return;
+ lastShot=now;
+ if(w.mag===undefined){melee(w);return}
+ if(w.id==="grenade"){grenadeAttack(w);return}
+ let a=ammo[current];
+ if(a.mag<=0){say("탄약이 없습니다. R로 재장전하세요.",800);return}
+ a.mag--;
+ let shot=yaw+(Math.random()-.5)*(w.spread||.03);
+ let target=null,best=Infinity;
+ for(let e of enemies){
+  if(e.hp<=0)continue;
+  let d=Math.hypot(e.x-player.x,e.y-player.y);
+  if(d>(w.range||15)||!clearLine(player.x,player.y,e.x,e.y))continue;
+  let ang=Math.abs(angleDiff(Math.atan2(e.y-player.y,e.x-player.x)-shot));
+  if(ang<Math.max(.035,.13/d)&&d<best){target=e;best=d}
+ }
+ if(target)hitEnemy(target,w.damage);
+ if(!w.sniper)yaw+=(Math.random()-.5)*(w.spread||.03)*.2;
+ updateHUD();
+}
+function hitEnemy(e,damage){
+ e.hp-=damage;e.hit=performance.now()+140;hitUntil=performance.now()+150;
+ if(e.hp<=0){
+  money+=300;kills++;feed="적 처치  +$300";feedUntil=performance.now()+1400;
+ }
+}
+function melee(w){
+ let target=null,best=Infinity;
+ enemies.forEach(e=>{
+  if(e.hp<=0)return;
+  let d=Math.hypot(e.x-player.x,e.y-player.y);
+  let a=Math.abs(angleDiff(Math.atan2(e.y-player.y,e.x-player.x)-yaw));
+  if(d<w.range&&a<.7&&d<best&&clearLine(player.x,player.y,e.x,e.y)){best=d;target=e}
+ });
+ if(target)hitEnemy(target,w.damage);else say("적이 가까이 없습니다.",600);
+ updateHUD();
+}
+function grenadeAttack(w){
+ if(!slots.grenade||!owned.has(slots.grenade)){say("수류탄을 구매하세요.");return}
+ let gx=player.x+Math.cos(yaw)*4,gy=player.y+Math.sin(yaw)*4;
+ enemies.forEach(e=>{
+  if(e.hp<=0)return;
+  let d=Math.hypot(e.x-gx,e.y-gy);
+  if(d<3.5&&clearLine(gx,gy,e.x,e.y))hitEnemy(e,Math.max(10,w.damage*(1-d/4)));
+ });
+ owned.delete("grenade");slots.grenade=null;
+ current=slots.rifle||slots.pistol||slots.knife;
+ say("수류탄 투척!");updateHUD();
+}
+function damagePlayer(amount){
+ if(armor>0){let block=Math.min(armor,amount*.6);armor-=block;amount-=block}
+ health-=amount;damageFlash=performance.now()+150;
+ if(health<=0){
+  health=0;running=false;gameOver=true;
+  $("overlay").classList.remove("hidden");
+  $("title").textContent="MISSION FAILED";
+  $("subtitle").textContent="체력이 소진되었습니다. 다시 시작해 보세요.";
+  $("startBtn").textContent="다시 시작";
+ }
+ updateHUD();
+}
+function update(dt,now){
+ if(!running)return;
+ completeReload(now);
+ let speed=(keys.ShiftLeft||keys.ShiftRight?1.6:3.0)*dt;
+ let f=(keys.KeyW?1:0)-(keys.KeyS?1:0);
+ let s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ let len=Math.hypot(f,s)||1;f/=len;s/=len;
+ let dx=(Math.cos(yaw)*f+Math.cos(yaw+Math.PI/2)*s)*speed;
+ let dy=(Math.sin(yaw)*f+Math.sin(yaw+Math.PI/2)*s)*speed;
+ if(!collides(player.x+dx,player.y,.2))player.x+=dx;
+ if(!collides(player.x,player.y+dy,.2))player.y+=dy;
+
+ // 점프: 입력 시 실제 점프 상태가 갱신된다. 카메라 위치는 변경하지 않는다.
+ if(jumpTime>0){
+  jumpTime=Math.max(0,jumpTime-dt);
+  jumpHeight=Math.sin((.48-jumpTime)/.48*Math.PI)*.35;
+ }else jumpHeight=0;
+
+ for(let e of enemies){
+  if(e.hp<=0)continue;
+  let dxp=player.x-e.x,dyp=player.y-e.y,d=Math.hypot(dxp,dyp);
+  if(d>1.5){
+   let vx=dxp/(d||1)*e.speed*dt,vy=dyp/(d||1)*e.speed*dt;
+   if(!collides(e.x+vx,e.y,.22))e.x+=vx;
+   if(!collides(e.x,e.y+vy,.22))e.y+=vy;
+  }
+  if(d<10&&now>e.nextFire&&clearLine(e.x,e.y,player.x,player.y)){
+   e.nextFire=now+1200+Math.random()*1000;
+   if(Math.random()<.48)damagePlayer(5+round);
+  }
+ }
+ if(mouseDown&&locked&&get(current).auto)fire();
+ if(enemies.length&&enemies.every(e=>e.hp<=0)&&!winTransition){
+  winTransition=true;running=false;money+=500;say("라운드 승리! +$500",2200);
+  setTimeout(()=>{
+   if(!gameOver){$("overlay").classList.remove("hidden");$("title").textContent="ROUND COMPLETE";$("subtitle").textContent="보상을 받았습니다. 다음 라운드를 준비하세요."; $("startBtn").textContent="다음 라운드 시작";renderShop();renderCharacters();}
+  },900);
+ }
+ updateHUD();
+}
+
+function ray(angle){
+ let d=0;
+ while(d<25){
+  d+=.025;
+  let x=player.x+Math.cos(angle)*d,y=player.y+Math.sin(angle)*d;
+  if(wall(x,y))return {d,x,y};
+ }
+ return {d:25,x:player.x+Math.cos(angle)*25,y:player.y+Math.sin(angle)*25};
+}
+function drawWorld(){
+ let W=canvas.width,H=canvas.height;
+ // 사막 하늘
+ let sky=ctx.createLinearGradient(0,0,0,H*.56);
+ sky.addColorStop(0,"#6db7e7");sky.addColorStop(.68,"#b8d5dd");sky.addColorStop(1,"#e5c89c");
+ ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*.56);
+ // 먼 사막 언덕
+ ctx.fillStyle="#c8a574";ctx.beginPath();ctx.moveTo(0,H*.53);
+ for(let x=0;x<=W;x+=40)ctx.lineTo(x,H*.47+Math.sin(x*.009)*H*.025);
+ ctx.lineTo(W,H*.7);ctx.lineTo(0,H*.7);ctx.fill();
+ let floor=ctx.createLinearGradient(0,H*.5,0,H);
+ floor.addColorStop(0,"#bfa071");floor.addColorStop(1,"#6e5034");
+ ctx.fillStyle=floor;ctx.fillRect(0,H*.5,W,H*.5);
+ // 바닥 모래 줄무늬
+ ctx.strokeStyle="#dfbd88";ctx.lineWidth=1;
+ for(let i=1;i<10;i++){
+  let y=H*.5+i*i*H*.005;
+  ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+ }
+ const rays=Math.min(W,1000),strip=W/rays;
+ const depth=new Array(rays);
+ for(let i=0;i<rays;i++){
+  let cam=i/rays*2-1;
+  let a=yaw+Math.atan(cam*Math.tan(FOV/2));
+  let hit=ray(a),d=hit.d*Math.cos(a-yaw);depth[i]=d;
+  let wh=Math.min(H*2,H/(d||.01));
+  let y=H/2-wh/2;
+  let tex=(Math.floor(hit.x*3)+Math.floor(hit.y*3))%3;
+  let light=clamp(205-d*9,45,195)*(tex===0?.9:tex===1?1:.78);
+  ctx.fillStyle=`rgb(${light},${light*.78},${light*.54})`;
+  ctx.fillRect(i*strip,y,strip+1,wh);
+  // sandstone block seams
+  ctx.strokeStyle="rgba(80,48,24,.20)";ctx.lineWidth=1;
+  for(let j=1;j<4;j++){
+   let sy=y+wh*j/4;
+   ctx.beginPath();ctx.moveTo(i*strip,sy);ctx.lineTo(i*strip+strip+1,sy);ctx.stroke();
+  }
+  ctx.fillStyle="rgba(0,0,0,.09)";ctx.fillRect(i*strip,y,strip+1,wh);
+ }
+ // 벽면의 사막빛 장식과 상자는 적보다 뒤에 배치
+ drawEnemies(W,H,depth,strip);
+ drawWeapon(W,H);
+}
+function drawEnemies(W,H,depth,strip){
+ let list=enemies.filter(e=>e.hp>0).map(e=>{
+  let dx=e.x-player.x,dy=e.y-player.y;
+  return {e,d:Math.hypot(dx,dy),a:angleDiff(Math.atan2(dy,dx)-yaw)};
+ }).filter(o=>Math.abs(o.a)<FOV*.8)
+ .sort((a,b)=>b.d-a.d);
+ for(let o of list){
+  const {e,d,a}=o;
+  if(!clearLine(player.x,player.y,e.x,e.y))continue;
+  let sx=W/2+Math.tan(a)/Math.tan(FOV/2)*W/2;
+  if(sx<0||sx>=W)continue;
+  let rayIndex=clamp(Math.floor(sx/W*depth.length),0,depth.length-1);
+  // 화면상의 벽이 적보다 가까우면 적을 그리지 않는다.
+  if(depth[rayIndex]<d*.96)continue;
+  let size=clamp(H/(d*.85),9,H*1.2),sy=H/2-size*.48;
+  let c=characters[(Math.floor(e.x+e.y)+round)%characters.length];
+  ctx.fillStyle="#302d29";ctx.fillRect(sx-size*.22,sy+size*.28,size*.44,size*.58);
+  ctx.fillStyle=e.hit>performance.now()?"#fff":c.color;
+  ctx.fillRect(sx-size*.17,sy+size*.04,size*.34,size*.27);
+  ctx.fillStyle="#d2a980";ctx.fillRect(sx-size*.105,sy+size*.12,size*.21,size*.09);
+  ctx.fillStyle="#27221d";
+  ctx.fillRect(sx-size*.28,sy+size*.31,size*.10,size*.34);
+  ctx.fillRect(sx+size*.18,sy+size*.31,size*.10,size*.34);
+  ctx.fillStyle="#25211e";ctx.fillRect(sx-size*.08,sy+size*.56,size*.16,size*.33);
+  let bw=size*.56;
+  ctx.fillStyle="#241e1a";ctx.fillRect(sx-bw/2,sy-size*.06,bw,5);
+  ctx.fillStyle="#e45543";ctx.fillRect(sx-bw/2,sy-size*.06,bw*clamp(e.hp/e.maxHp,0,1),5);
+ }
+}
+function drawWeapon(W,H){
+ let w=get(current),x=W*.61,y=H;
+ ctx.save();
+ // 무기 위치는 점프 높이와 독립적이므로 화면이 위아래로 흔들리지 않는다.
+ if(w.mag===undefined){
+  ctx.translate(x,y-H*.04);ctx.rotate(-.25);
+  ctx.fillStyle="#24272b";ctx.fillRect(-13,-H*.15,26,H*.12);
+  ctx.fillStyle=w.id==="karambit"?"#d2b36f":"#c6cdd0";
+  ctx.beginPath();ctx.moveTo(-10,-H*.16);ctx.lineTo(0,-H*.43);ctx.lineTo(12,-H*.16);ctx.closePath();ctx.fill();
+ }else if(w.id==="grenade"){
+  ctx.translate(x,y-H*.15);ctx.fillStyle="#65784c";
+  ctx.beginPath();ctx.arc(0,0,Math.min(W,H)*.07,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#272e24";ctx.lineWidth=5;ctx.stroke();
+ }else{
+  let pw=w.mag<15?W*.15:W*.24,ph=w.mag<15?H*.14:H*.22;
+  ctx.translate(x,y-H*.02);
+  ctx.fillStyle="#17191b";
+  ctx.beginPath();ctx.moveTo(-pw*.2,0);ctx.lineTo(-pw*.2,-ph*.5);ctx.lineTo(pw*.08,-ph*.72);ctx.lineTo(pw*.39,-ph*.7);ctx.lineTo(pw*.44,-ph*.5);ctx.lineTo(pw*.44,0);ctx.closePath();ctx.fill();
+  ctx.fillStyle=w.sniper?"#667b87":"#77776c";
+  ctx.fillRect(-pw*.23,-ph*.74,pw*.68,ph*.21);
+  ctx.fillStyle="#25292c";ctx.fillRect(-pw*.08,-ph*.88,pw*.5,ph*.16);
+  ctx.fillStyle="#101214";ctx.fillRect(-pw*.02,-ph*.96,pw*.42,ph*.09);
+  ctx.fillStyle="#35312a";ctx.fillRect(-pw*.1,-ph*.52,pw*.19,ph*.52);
+  ctx.fillStyle="#b58a66";ctx.fillRect(pw*.08,-ph*.24,pw*.2,ph*.24);
+ }
+ ctx.restore();
+}
+function render(){
+ drawWorld();
+ let now=performance.now();
+ $("message").textContent=now<messageUntil?message:"";
+ if(now<hitUntil){
+  ctx.strokeStyle="#fff";ctx.lineWidth=2;
+  let x=canvas.width/2,y=canvas.height/2,s=8;
+  ctx.beginPath();ctx.moveTo(x-s,y-s);ctx.lineTo(x-3,y-3);
+  ctx.moveTo(x+s,y-s);ctx.lineTo(x+3,y-3);
+  ctx.moveTo(x-s,y+s);ctx.lineTo(x-3,y+3);
+  ctx.moveTo(x+s,y+s);ctx.lineTo(x+3,y+3);ctx.stroke();
+ }
+ if(now<damageFlash){ctx.fillStyle="#ff000022";ctx.fillRect(0,0,canvas.width,canvas.height)}
+ // Jump indicator helps confirm that Space was registered without moving the camera.
+ if(running&&jumpTime>0){
+  ctx.fillStyle="#fff";ctx.font="12px Arial";ctx.textAlign="center";
+  ctx.fillText("JUMP",canvas.width/2,canvas.height/2+32);
+ }
+}
+
+function loop(now){
+ let dt=Math.min((now-lastTime)/1000||0,.04);lastTime=now;
+ update(dt,now);render();requestAnimationFrame(loop);
+}
+document.addEventListener("pointerlockchange",()=>{
+ locked=document.pointerLockElement===canvas;
+});
+canvas.addEventListener("click",()=>{
+ if(!running)return;
+ if(!locked){canvas.requestPointerLock?.();return}
+ fire();
+});
+document.addEventListener("mousemove",e=>{
+ if(!locked||!running)return;
+ yaw+=e.movementX*.0025;
+ pitch=clamp(pitch+e.movementY*.0015,-.4,.4);
+});
+document.addEventListener("mousedown",e=>{
+ if(e.button===0&&running&&locked)mouseDown=true;
+});
+document.addEventListener("mouseup",e=>{if(e.button===0)mouseDown=false});
+document.addEventListener("keydown",e=>{
+ keys[e.code]=true;
+ if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+ if(e.repeat)return;
+ if(e.code==="Space"&&running&&jumpTime<=0){jumpTime=.48;jumpHeight=0;say("점프!",450)}
+ if(e.code==="Digit1")switchSlot("rifle");
+ if(e.code==="Digit2")switchSlot("pistol");
+ if(e.code==="Digit3")switchSlot("knife");
+ if(e.code==="Digit4")switchSlot("grenade");
+ if(e.code==="KeyR")reload();
+ if(e.code==="KeyB"&&running){mouseDown=false;openShop()}
+});
+document.addEventListener("keyup",e=>{keys[e.code]=false});
+document.addEventListener("contextmenu",e=>e.preventDefault());
+addEventListener("blur",()=>{keys={};mouseDown=false});
+document.addEventListener("visibilitychange",()=>{if(document.hidden){keys={};mouseDown=false}});
+renderCharacters();renderShop();updateHUD();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
